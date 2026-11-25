@@ -1,0 +1,1509 @@
+<!doctype html>
+<!--
+MIT License
+
+Copyright (c) 
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ST Beautifier</title>
+<style>
+:root {
+  --bg: #FFFFFF; --fg: #1F2328; --muted: #5B6270; --panel: #F6F7F9; --border: #D8DCE3;
+  --accent: #1F4FB8; --hl: #FFF3B0; --occ: #E3EDFF; --gutter: #7A808C; --err: #B42318;
+  --kw: #1F4FB8; --struct: #6A3FB5; --type: #0B7A75; --lit: #A3510B; --str: #2E7D32;
+  --cmt: #6B7280; --prag: #8A6D00; --id: #1F2328; --op: #1F2328;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1E1F22; --fg: #E6E6E6; --muted: #A0A6B2; --panel: #26272B; --border: #3A3C42;
+    --accent: #82AAFF; --hl: #4A4420; --occ: #2D3B57; --gutter: #7F8694; --err: #FF8A80;
+    --kw: #82AAFF; --struct: #C792EA; --type: #4EC9B0; --lit: #F78C6C; --str: #C3E88D;
+    --cmt: #8B95A5; --prag: #E5C07B; --id: #E6E6E6; --op: #E6E6E6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1E1F22; --fg: #E6E6E6; --muted: #A0A6B2; --panel: #26272B; --border: #3A3C42;
+  --accent: #82AAFF; --hl: #4A4420; --occ: #2D3B57; --gutter: #7F8694; --err: #FF8A80;
+  --kw: #82AAFF; --struct: #C792EA; --type: #4EC9B0; --lit: #F78C6C; --str: #C3E88D;
+  --cmt: #8B95A5; --prag: #E5C07B; --id: #E6E6E6; --op: #E6E6E6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.55 system-ui, "Segoe UI", sans-serif; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button, select { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+button:hover, select:hover { border-color: var(--accent); }
+button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.code, textarea, pre {
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+  font-size: 14px; line-height: 1.55; tab-size: 4;
+}
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.toolbar h1 { font-size: 16px; margin: 0 12px 0 0; font-weight: 600; }
+.toolbar .theme { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+.status { margin-left: auto; color: var(--muted); font-size: 12px; }
+.note { margin: 0; padding: 6px 12px; background: var(--panel); color: var(--muted); border-bottom: 1px solid var(--border); font-size: 12px; }
+.note[hidden] { display: none; }
+.panes { display: flex; height: calc(100% - 92px); min-height: 360px; }
+.pane { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
+.pane.input { border-right: 1px solid var(--border); }
+.pane.input label { padding: 6px 12px; color: var(--muted); font-size: 12px; }
+.editor { position: relative; flex: 1 1 auto; min-height: 200px; }
+.editor-hl, textarea#src { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; padding: 8px 12px; white-space: pre; overflow: auto; box-sizing: border-box; }
+.editor-hl { overflow: hidden; pointer-events: none; background: var(--bg); color: var(--fg); }
+textarea#src { resize: none; background: transparent; color: transparent; caret-color: var(--fg); }
+textarea#src::placeholder { color: var(--muted); }
+textarea#src::selection { background: var(--occ); }
+.output { overflow: auto; }
+#out { padding: 8px 0 24px; min-height: 100%; }
+.ln { display: flex; white-space: pre; }
+.ln[hidden] { display: none; }
+.gut { flex: 0 0 4.5em; text-align: right; padding-right: 12px; color: var(--gutter); user-select: none; -webkit-user-select: none; display: flex; justify-content: flex-end; gap: 4px; }
+.fold { border: 0; background: none; padding: 0 2px; color: var(--muted); cursor: pointer; line-height: 1; }
+.code-line { position: relative; flex: 1; padding-right: 16px; min-height: 1.55em; }
+.ig { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border); opacity: .6; pointer-events: none; }
+.t-kw { color: var(--kw); font-weight: 600; }
+.t-struct { color: var(--struct); font-weight: 600; }
+.t-type { color: var(--type); }
+.t-lit { color: var(--lit); }
+.t-str { color: var(--str); }
+.t-cmt { color: var(--cmt); font-style: italic; }
+.t-prag { color: var(--prag); }
+.t-id { color: var(--id); }
+.t-call { color: var(--id); font-weight: 600; }
+.t-op, .t-punct { color: var(--op); }
+.t-unk { color: var(--err); text-decoration: underline wavy var(--err); }
+.hl, .hl2 { background: var(--hl); border-radius: 2px; }
+.occ { background: var(--occ); border-radius: 2px; }
+dialog { border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); padding: 0; width: min(960px, 96vw); max-height: 90vh; }
+dialog::backdrop { background: rgba(0, 0, 0, .35); }
+.dlg { display: flex; flex-direction: column; max-height: 90vh; }
+.dlg-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.dlg-head h2 { font-size: 16px; margin: 0; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 14px 0; border-bottom: 1px solid var(--border); }
+.tabs button { border-radius: 4px 4px 0 0; border-bottom: 0; }
+.tabs button[aria-selected="true"] { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+.dlg-body { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(260px, 1.1fr); gap: 14px; padding: 12px 14px; overflow: auto; }
+.fields .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px dotted var(--border); }
+.fields .row span { color: var(--fg); }
+.preview { min-width: 0; }
+.preview-label { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+#preview { border: 1px solid var(--border); border-radius: 4px; padding: 8px 0; overflow: auto; max-height: 60vh; background: var(--bg); }
+.io { padding: 8px 14px 12px; border-top: 1px solid var(--border); }
+.io textarea { width: 100%; height: 110px; margin: 6px 0; border: 1px solid var(--border); border-radius: 4px; padding: 6px; background: var(--bg); }
+#ioMsg { color: var(--muted); margin-left: 8px; font-size: 12px; }
+@media (max-width: 899px) {
+  .panes { flex-direction: column; height: auto; }
+  .pane.input { border-right: 0; border-bottom: 1px solid var(--border); height: 45vh; }
+  .output { min-height: 50vh; }
+  .dlg-body { grid-template-columns: 1fr; }
+}
+body.reading .pane.input { display: none; }
+@media print {
+  :root { --bg: #FFFFFF; --fg: #000000; --gutter: #555555; --cmt: #444444; --kw: #000080; --struct: #000080; --type: #005050; --lit: #7a3300; --str: #006400; --prag: #5a4800; --id: #000000; --op: #000000; }
+  body { background: #FFFFFF; color: #000000; height: auto; }
+  .toolbar, .note, .pane.input, .fold, dialog { display: none !important; }
+  .panes { display: block; height: auto; }
+  .output { overflow: visible; }
+  .ln[hidden] { display: flex !important; }
+}
+</style>
+</head>
+<body>
+<header class="toolbar" role="toolbar" aria-label="Main">
+  <h1>ST Beautifier</h1>
+  <button id="btnFormat" type="button" title="Apply the formatting settings to the input. Ctrl+Z undoes it.">Format</button>
+  <button id="btnClear" type="button">Clear</button>
+  <button id="btnSample" type="button">Load sample</button>
+  <button id="btnCollapse" type="button" aria-pressed="false">Collapse input</button>
+  <button id="btnCopy" type="button">Copy</button>
+  <label class="theme">Theme
+    <select id="theme" aria-label="Theme">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+  </label>
+  <button id="btnSettings" type="button">Settings</button>
+  <span id="status" class="status" role="status"></span>
+</header>
+<p id="storeNote" class="note" hidden>Settings will not be remembered in this browser (storage is blocked). The tool works on defaults; Export / Import in Settings still works.</p>
+<main class="panes">
+  <section class="pane input" id="inputPane">
+    <label for="src">Structured Text (pasted code is never stored or sent anywhere)</label>
+    <div class="editor">
+      <div id="srcHl" class="code editor-hl" aria-hidden="true"></div>
+      <textarea id="src" spellcheck="false" wrap="off" placeholder="Paste Structured Text here (Rockwell, TwinCAT or SCL)."></textarea>
+    </div>
+  </section>
+  <section class="pane output"><div id="out" class="code" aria-label="Highlighted code"></div></section>
+</main>
+
+<dialog id="settingsDlg" aria-labelledby="settingsTitle">
+  <div class="dlg">
+    <div class="dlg-head">
+      <h2 id="settingsTitle">Formatting settings</h2>
+      <button id="btnCloseSettings" type="button">Close</button>
+    </div>
+    <div id="tabs" class="tabs" role="tablist"></div>
+    <div class="dlg-body">
+      <div id="fields" class="fields"></div>
+      <div class="preview">
+        <div class="preview-label">Live preview (sample routine)</div>
+        <div id="preview" class="code"></div>
+      </div>
+    </div>
+    <details class="io">
+      <summary>Export / Import (settings as JSON text)</summary>
+      <textarea id="io" spellcheck="false" aria-label="Settings JSON"></textarea>
+      <div>
+        <button id="btnExport" type="button">Export to text</button>
+        <button id="btnImport" type="button">Import from text</button>
+        <button id="btnReset" type="button">Reset to defaults</button>
+        <span id="ioMsg" role="status"></span>
+      </div>
+    </details>
+  </div>
+</dialog>
+
+<script>
+'use strict';
+/* ==========================================================================
+   ST Beautifier. One self-contained file: no network, no dependencies.
+   Sections:  0 settings | 1 tokenizer (pure) | 2 formatter (pure)
+              3 rendering (tokens -> DOM) | 4 UI wiring
+   Pasted code is never stored or sent anywhere; only the settings are kept
+   in this browser's localStorage.
+   ========================================================================== */
+
+// ---------- 0. Settings ----------------------------------------------------
+const SETTINGS_VERSION = 1;
+const STORAGE_KEY = 'stBeautifier.settings';
+
+// Default formatting settings.
+const DEFAULT_SETTINGS = Object.freeze({
+  maxLineLength: 0,              // 0 = off
+  breakConditions: 'never',      // never | whenTooLong | always
+  operatorPosition: 'start',     // start | end
+  indentNestedParens: true,
+  thenDoPlacement: 'ownLine',    // ownLine | endOfLine
+  callParams: 'whenMoreThanN',   // oneLine | whenMoreThanN | whenTooLong
+  callParamThreshold: 5,         // N for whenMoreThanN
+  oneStatementPerLine: true,
+  indentWith: 'tabs',            // tabs | spaces
+  indentSize: 4,                 // 2 | 3 | 4
+  indentCaseLabels: true,
+  indentCaseStatements: true,
+  indentDeclarations: true,
+  alignDeclColon: true,
+  alignDeclInit: true,
+  alignAssignments: true,
+  alignCallParams: true,
+  alignTrailingComments: true,
+  spaceAroundOps: true,
+  spaceAfterComma: true,
+  spaceInsideParens: false,
+  spaceBeforeSemicolon: false,
+  keywordCase: 'upper',          // upper | lower | keep
+  typeCase: 'upper',             // upper | keep
+  boolCase: 'upper',             // upper | keep
+  maxBlankLines: '1',            // '0' | '1' | '2' | 'keep'
+  blankLineBetweenVar: true,
+  trimTrailingWhitespace: true,
+  regionBlankBefore: 'yes',      // yes | no | keep
+  regionBlankAfter: 'yes',       // yes | no | keep
+  commentBlankBefore: 'yes',     // yes | no | keep: before (* ... *) comment sections
+  commentBlankAfter: 'yes',      // yes | no | keep: after (* ... *) comment sections
+});
+
+const SETTING_GROUPS = ['Line breaking', 'Indentation', 'Alignment', 'Spacing', 'Casing', 'Blank lines'];
+
+const SETTING_DEFS = [
+  { key: 'maxLineLength', group: 'Line breaking', label: 'Max line length', type: 'select',
+    options: [[80, '80'], [100, '100'], [120, '120'], [0, 'off']] },
+  { key: 'breakConditions', group: 'Line breaking', label: 'Break long conditions (IF, ELSIF, WHILE, UNTIL)', type: 'select',
+    options: [['never', 'never'], ['whenTooLong', 'when too long'], ['always', 'always']] },
+  { key: 'operatorPosition', group: 'Line breaking', label: 'Operator position on break', type: 'select',
+    options: [['start', 'start of new line'], ['end', 'end of line']] },
+  { key: 'indentNestedParens', group: 'Line breaking', label: 'Indent nested parentheses as a group', type: 'bool' },
+  { key: 'thenDoPlacement', group: 'Line breaking', label: 'THEN / DO placement after a broken condition', type: 'select',
+    options: [['ownLine', 'own line'], ['endOfLine', 'end of last line']] },
+  { key: 'callParams', group: 'Line breaking', label: 'FB / instruction call parameters', type: 'select',
+    options: [['oneLine', 'one line'], ['whenMoreThanN', 'one per line when > N'], ['whenTooLong', 'one per line when too long']] },
+  { key: 'callParamThreshold', group: 'Line breaking', label: 'N (parameters, used by "> N")', type: 'select',
+    options: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((n) => [n, String(n)]) },
+  { key: 'oneStatementPerLine', group: 'Line breaking', label: 'One statement per line', type: 'bool' },
+
+  { key: 'indentWith', group: 'Indentation', label: 'Indent with', type: 'select',
+    options: [['spaces', 'spaces'], ['tabs', 'tabs']] },
+  { key: 'indentSize', group: 'Indentation', label: 'Indent size / tab width', type: 'select',
+    options: [[2, '2'], [3, '3'], [4, '4']] },
+  { key: 'indentCaseLabels', group: 'Indentation', label: 'Indent CASE labels', type: 'bool' },
+  { key: 'indentCaseStatements', group: 'Indentation', label: 'Indent statements under CASE label', type: 'bool' },
+  { key: 'indentDeclarations', group: 'Indentation', label: 'Indent declarations inside VAR', type: 'bool' },
+
+  { key: 'alignDeclColon', group: 'Alignment', label: 'Align : in VAR declarations', type: 'bool' },
+  { key: 'alignDeclInit', group: 'Alignment', label: 'Align := initial values in VAR', type: 'bool' },
+  { key: 'alignAssignments', group: 'Alignment', label: 'Align := in consecutive assignments', type: 'bool' },
+  { key: 'alignCallParams', group: 'Alignment', label: 'Align := / => in parameter lists', type: 'bool' },
+  { key: 'alignTrailingComments', group: 'Alignment', label: 'Align trailing // comments in a block', type: 'bool' },
+
+  { key: 'spaceAroundOps', group: 'Spacing', label: 'Spaces around := => comparison and arithmetic', type: 'bool' },
+  { key: 'spaceAfterComma', group: 'Spacing', label: 'Space after comma', type: 'bool' },
+  { key: 'spaceInsideParens', group: 'Spacing', label: 'Space inside parentheses', type: 'bool' },
+  { key: 'spaceBeforeSemicolon', group: 'Spacing', label: 'Space before ;', type: 'bool' },
+
+  { key: 'keywordCase', group: 'Casing', label: 'Keywords', type: 'select',
+    options: [['upper', 'UPPER'], ['lower', 'lower'], ['keep', 'keep']] },
+  { key: 'typeCase', group: 'Casing', label: 'Elementary data types', type: 'select',
+    options: [['upper', 'UPPER'], ['keep', 'keep']] },
+  { key: 'boolCase', group: 'Casing', label: 'TRUE / FALSE', type: 'select',
+    options: [['upper', 'UPPER'], ['keep', 'keep']] },
+
+  { key: 'maxBlankLines', group: 'Blank lines', label: 'Max consecutive blank lines', type: 'select',
+    options: [['0', '0'], ['1', '1'], ['2', '2'], ['keep', 'keep']] },
+  { key: 'blankLineBetweenVar', group: 'Blank lines', label: 'Blank line between VAR blocks', type: 'bool' },
+  { key: 'trimTrailingWhitespace', group: 'Blank lines', label: 'Remove trailing whitespace', type: 'bool' },
+  { key: 'regionBlankBefore', group: 'Blank lines', label: 'Blank line before #region / REGION (not the header region)', type: 'select',
+    options: [['yes', 'yes'], ['no', 'no'], ['keep', 'keep']] },
+  { key: 'regionBlankAfter', group: 'Blank lines', label: 'Blank line after #endregion / END_REGION, and after the header block', type: 'select',
+    options: [['yes', 'yes'], ['no', 'no'], ['keep', 'keep']] },
+  { key: 'commentBlankBefore', group: 'Blank lines', label: 'Blank line before (* ... *) comment sections', type: 'select',
+    options: [['yes', 'yes'], ['no', 'no'], ['keep', 'keep']] },
+  { key: 'commentBlankAfter', group: 'Blank lines', label: 'Blank line after (* ... *) comment sections', type: 'select',
+    options: [['yes', 'yes'], ['no', 'no'], ['keep', 'keep']] },];
+
+// Merge saved settings over the defaults. Unknown keys are ignored, bad values fall back to the default.
+function mergeSettings(saved) {
+  const out = { ...DEFAULT_SETTINGS };
+  if (!saved || typeof saved !== 'object') return out;
+  for (const def of SETTING_DEFS) {
+    if (!Object.prototype.hasOwnProperty.call(saved, def.key)) continue;
+    const v = saved[def.key];
+    if (def.type === 'bool') {
+      if (typeof v === 'boolean') out[def.key] = v;
+    } else {
+      const hit = def.options.find((o) => String(o[0]) === String(v));
+      if (hit) out[def.key] = hit[0];
+    }
+  }
+  return out;
+}
+
+// ---------- 1. Tokenizer (pure) -------------------------------------------
+const KW_FLOW = new Set(['IF', 'THEN', 'ELSIF', 'ELSE', 'CASE', 'OF', 'FOR', 'TO', 'BY', 'DO', 'WHILE', 'REPEAT', 'UNTIL', 'RETURN', 'EXIT', 'CONTINUE']);
+const KW_DECL = new Set(['FUNCTION_BLOCK', 'FUNCTION', 'PROGRAM', 'METHOD', 'PROPERTY', 'INTERFACE', 'VAR', 'VAR_INPUT', 'VAR_OUTPUT', 'VAR_IN_OUT', 'VAR_TEMP', 'VAR_STAT', 'VAR_GLOBAL', 'CONSTANT', 'RETAIN', 'PERSISTENT']);
+const KW_STRUCT = new Set(['REGION', 'TYPE', 'STRUCT']);
+const WORD_OPS = new Set(['AND', 'OR', 'XOR', 'NOT', 'MOD', 'AND_THEN', 'OR_ELSE']);
+const ELEMENTARY = new Set(['BOOL', 'BYTE', 'WORD', 'DWORD', 'LWORD', 'SINT', 'INT', 'DINT', 'LINT', 'USINT', 'UINT', 'UDINT', 'ULINT', 'REAL', 'LREAL', 'TIME', 'LTIME', 'DATE', 'TIME_OF_DAY', 'TOD', 'DATE_AND_TIME', 'DT', 'LDT', 'STRING', 'WSTRING', 'CHAR', 'WCHAR']);
+const TYPE_WORDS = new Set([...ELEMENTARY, 'ARRAY', 'POINTER', 'REFERENCE']);
+// Opening keyword -> its closing keyword. Used for folding, partner highlight and indentation.
+const OPENERS = {
+  IF: 'END_IF', CASE: 'END_CASE', FOR: 'END_FOR', WHILE: 'END_WHILE', REPEAT: 'END_REPEAT',
+  VAR: 'END_VAR', VAR_INPUT: 'END_VAR', VAR_OUTPUT: 'END_VAR', VAR_IN_OUT: 'END_VAR', VAR_TEMP: 'END_VAR',
+  VAR_STAT: 'END_VAR', VAR_GLOBAL: 'END_VAR', FUNCTION_BLOCK: 'END_FUNCTION_BLOCK', FUNCTION: 'END_FUNCTION',
+  PROGRAM: 'END_PROGRAM', METHOD: 'END_METHOD', PROPERTY: 'END_PROPERTY', INTERFACE: 'END_INTERFACE',
+  REGION: 'END_REGION', STRUCT: 'END_STRUCT', TYPE: 'END_TYPE',
+};
+
+// Token classes: kw, struct, wordop, type, lit, str, cmt, prag, ident, call, op, punct, ws, unk
+function classifyWord(w) {
+  const u = w.toUpperCase();
+  if (KW_FLOW.has(u) || KW_DECL.has(u)) return 'kw';
+  if (KW_STRUCT.has(u) || /^END_[A-Z_]+$/.test(u)) return 'struct';
+  if (WORD_OPS.has(u)) return 'wordop';
+  if (TYPE_WORDS.has(u)) return 'type';
+  if (u === 'TRUE' || u === 'FALSE') return 'lit';
+  if (/^(FB|ST|E|U|I|F|TL|GL)_/.test(w)) return 'type'; // common type-name prefixes (FB_, ST_, E_ ...), case-sensitive
+  return null;
+}
+
+const RE = {
+  ws: /\s+/y,
+  lineCmt: /\/\/[^\r\n]*/y,
+  dq: /"[^"\r\n]*"(?:\.[A-Za-z_]\w*)*/y,            // Siemens "DB".member, treated as identifier
+  typed: /(?:[A-Za-z]\w*|\d[\d_]*)#[A-Za-z0-9_.:+\-]*/y, // T#2S, 16#FF, INT#5
+  num: /\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?/y,
+  tag: /[A-Za-z_]\w*:\d+(?::[A-Za-z_0-9]\w*)*(?:\.\w+)*/y, // Rockwell I/O tag Local:1:I.Data.3
+  ident: /#?[A-Za-z_]\w*(?:\[[^\[\]\r\n]*\]|\.\w+)*/y,  // Tag.5, Tag[i], #localVar
+  ops: /:=|=>|<>|<=|>=|\*\*|\.\./y,
+  op1: /[-+*\/^=<>&]/y,
+  punct: /[()\[\];,:.]/y,
+};
+
+function tokenize(text) {
+  const out = [];
+  const n = text.length;
+  let i = 0;
+  let line = 1;
+  const exec = (re, pos) => { re.lastIndex = pos; return re.exec(text); };
+  const push = (type, end) => {
+    const t = text.slice(i, end);
+    out.push({ type, text: t, line });
+    for (let k = 0; k < t.length; k++) if (t.charCodeAt(k) === 10) line++;
+    i = end;
+  };
+  const nested = (pos, open, close) => {
+    let depth = 0;
+    let j = pos;
+    while (j < n) {
+      if (text.startsWith(open, j)) { depth++; j += open.length; }
+      else if (text.startsWith(close, j)) { depth--; j += close.length; if (depth === 0) return j; }
+      else j++;
+    }
+    return n; // unterminated: the rest is comment
+  };
+  const stringEnd = (pos) => {
+    let j = pos + 1;
+    while (j < n) {
+      const ch = text[j];
+      if (ch === '$' && j + 1 < n) { j += 2; continue; }
+      if (ch === "'") return j + 1;
+      if (ch === '\n' || ch === '\r') return j; // unterminated: ends at line end
+      j++;
+    }
+    return n;
+  };
+  const pragmaEnd = (pos) => {
+    let j = pos + 1;
+    while (j < n && text[j] !== '}' && text[j] !== '\n' && text[j] !== '\r') j++;
+    return j < n && text[j] === '}' ? j + 1 : j;
+  };
+
+  while (i < n) {
+    const c = text[i];
+    let m;
+    if ((m = exec(RE.ws, i))) { push('ws', i + m[0].length); continue; }
+    if (c === '/' && text[i + 1] === '/') { m = exec(RE.lineCmt, i); push('cmt', i + m[0].length); continue; }
+    if (c === '(' && text[i + 1] === '*') { push('cmt', nested(i, '(*', '*)')); continue; }
+    if (c === '/' && text[i + 1] === '*') { push('cmt', nested(i, '/*', '*/')); continue; }
+    if (c === '{') { push('prag', pragmaEnd(i)); continue; }
+    if (c === "'") { push('str', stringEnd(i)); continue; }
+    if (c === '"' && (m = exec(RE.dq, i))) { push('ident', i + m[0].length); continue; }
+    if ((m = exec(RE.typed, i))) { push('lit', i + m[0].length); continue; }
+    if ((m = exec(RE.num, i))) { push('lit', i + m[0].length); continue; }
+    if ((m = exec(RE.tag, i))) { push('ident', i + m[0].length); continue; }
+    if ((m = exec(RE.ident, i))) {
+      const w = m[0];
+      const bare = /^[A-Za-z_]\w*/.exec(w);
+      // keyword or type directly followed by [ (e.g. ARRAY[1..3]): the bracket is a separate token
+      if (bare && bare[0].length < w.length && classifyWord(bare[0])) {
+        push(classifyWord(bare[0]), i + bare[0].length);
+        continue;
+      }
+      const end = i + w.length;
+      let j = end;
+      while (text[j] === ' ' || text[j] === '\t') j++;
+      const isCall = text[j] === '(' && text[j + 1] !== '*';
+      const cls = /^\w+$/.test(w) ? classifyWord(w) : null;
+      // a name with a type prefix (FB_, ST_ ...) followed by ( is a function block / function call
+      if (cls && !(cls === 'type' && isCall)) { push(cls, end); continue; }
+      push(isCall ? 'call' : 'ident', end);
+      continue;
+    }
+    if ((m = exec(RE.ops, i))) { push(m[0] === '..' ? 'punct' : 'op', i + m[0].length); continue; }
+    if ((m = exec(RE.op1, i))) { push('op', i + 1); continue; }
+    if ((m = exec(RE.punct, i))) { push('punct', i + 1); continue; }
+    push('unk', i + 1);
+  }
+  return out;
+}
+
+// Opening/closing keyword pairs as a Map (index -> partner index), both directions.
+function pairBlocks(tokens) {
+  const pairs = new Map();
+  const stack = [];
+  tokens.forEach((t, idx) => {
+    if (t.type !== 'kw' && t.type !== 'struct') return;
+    const u = t.text.toUpperCase();
+    if (u.startsWith('END_')) {
+      for (let k = stack.length - 1; k >= 0; k--) {
+        const o = stack[k];
+        if (OPENERS[tokens[o].text.toUpperCase()] === u) {
+          pairs.set(o, idx);
+          pairs.set(idx, o);
+          stack.splice(k, 1);
+          break;
+        }
+      }
+    } else if (Object.prototype.hasOwnProperty.call(OPENERS, u)) {
+      stack.push(idx);
+    }
+  });
+  return pairs;
+}
+
+// ---------- 2. Formatter (pure) -------------------------------------------
+// Hard rule: only whitespace, line breaks and keyword casing change. Tokens are never added,
+// removed or reordered.
+
+const isCmt = (t) => t.type === 'cmt';
+const isSig = (t) => t.type !== 'ws' && t.type !== 'cmt';
+// a logical line that holds only comments
+const cmtOnly = (L) => L.toks.every(isCmt) && (L.toks.length > 0 || !!L.comment);
+// combine two blank-line rules: any 'yes' adds a blank, else any 'no' removes them
+const mergeRule = (a, b) => ((a === 'yes' || b === 'yes') ? 'yes' : (a === 'no' || b === 'no') ? 'no' : 'keep');
+const isColon = (t) => t.type === 'punct' && t.text === ':';
+const isAssign = (t) => t.type === 'op' && t.text === ':=';
+const cmtText = (c) => (c ? c.text : null);
+
+// Depth-0 search (parentheses and brackets counted).
+function findTop(toks, pred) {
+  let d = 0;
+  for (let k = 0; k < toks.length; k++) {
+    const t = toks[k];
+    if (t.type === 'punct') {
+      if (t.text === '(' || t.text === '[') d++;
+      else if (t.text === ')' || t.text === ']') d--;
+    }
+    if (d === 0 && pred(t)) return k;
+  }
+  return -1;
+}
+
+function splitTop(toks, pred) {
+  const parts = [[]];
+  let d = 0;
+  for (const t of toks) {
+    if (t.type === 'punct') {
+      if (t.text === '(' || t.text === '[') d++;
+      else if (t.text === ')' || t.text === ']') d--;
+    }
+    if (d === 0 && pred(t)) parts.push([]);
+    else parts[parts.length - 1].push(t);
+  }
+  return parts;
+}
+
+// Split a condition at depth-0 AND / OR. First item has op null.
+function splitOps(toks) {
+  const items = [];
+  let cur = [];
+  let op = null;
+  let d = 0;
+  for (const t of toks) {
+    if (t.type === 'punct') {
+      if (t.text === '(' || t.text === '[') d++;
+      else if (t.text === ')' || t.text === ']') d--;
+    }
+    const u = t.text.toUpperCase();
+    if (d === 0 && t.type === 'wordop' && (u === 'AND' || u === 'OR')) {
+      items.push({ op, toks: cur });
+      cur = [];
+      op = t;
+      continue;
+    }
+    cur.push(t);
+  }
+  items.push({ op, toks: cur });
+  return items;
+}
+
+// True if the first '(' closes at the last token.
+function wrapsWhole(toks) {
+  if (toks.length < 2 || toks[0].text !== '(' || toks[toks.length - 1].text !== ')') return false;
+  let d = 0;
+  for (let k = 0; k < toks.length; k++) {
+    const t = toks[k];
+    if (t.type !== 'punct') continue;
+    if (t.text === '(') d++;
+    else if (t.text === ')') {
+      d--;
+      if (d === 0) return k === toks.length - 1;
+    }
+  }
+  return false;
+}
+
+function casedText(t, s) {
+  const u = t.text.toUpperCase();
+  switch (t.type) {
+    case 'kw':
+    case 'struct':
+    case 'wordop':
+      if (s.keywordCase === 'upper') return u;
+      if (s.keywordCase === 'lower') return t.text.toLowerCase();
+      return t.text;
+    case 'lit':
+      if (u === 'TRUE' || u === 'FALSE') return s.boolCase === 'upper' ? u : t.text;
+      return t.text;
+    case 'type':
+      if (TYPE_WORDS.has(u)) return s.typeCase === 'upper' ? u : t.text;
+      return t.text;
+    default:
+      return t.text;
+  }
+}
+
+function unaryContext(pp) {
+  if (!pp) return true;
+  if (pp.type === 'op' || pp.type === 'kw' || pp.type === 'wordop' || pp.type === 'struct') return true;
+  return pp.text === '(' || pp.text === '[' || pp.text === ',' || pp.text === ':';
+}
+
+function sepBetween(toks, i, s) {
+  const p = toks[i - 1];
+  const c = toks[i];
+  const pp = i >= 2 ? toks[i - 2] : null;
+  const pt = p.text;
+  const ct = c.text;
+  if (isCmt(p) || isCmt(c)) return ' ';
+  if (ct === ';') return s.spaceBeforeSemicolon ? ' ' : '';
+  if (ct === ',') return '';
+  if (pt === ',') return s.spaceAfterComma ? ' ' : '';
+  if (pt === '(') return s.spaceInsideParens ? ' ' : '';
+  if (ct === ')') return s.spaceInsideParens ? ' ' : '';
+  if (pt === '[' || ct === ']') return '';
+  if (ct === '[') return (p.type === 'type' || p.type === 'kw' || p.type === 'struct') ? ' ' : '';
+  if (pt === '.' || pt === '..' || ct === '.' || ct === '..') return '';
+  if (ct === '(') return (p.type === 'ident' || p.type === 'call') ? '' : ' ';
+  if (ct === ':') return '';
+  if (pt === ':') return ' ';
+  if (p.type === 'op' && (pt === '-' || pt === '+') && c.type !== 'op' && unaryContext(pp)) return '';
+  if (p.type === 'op' || c.type === 'op') return s.spaceAroundOps ? ' ' : '';
+  return ' ';
+}
+
+// Flat text of a token run, with casing and spacing applied.
+function renderTokens(toks, s) {
+  let out = '';
+  for (let i = 0; i < toks.length; i++) {
+    if (i > 0) out += sepBetween(toks, i, s);
+    out += casedText(toks[i], s);
+  }
+  return out;
+}
+
+// Group tokens into logical statements/lines. Newlines inside parentheses are joined.
+function shouldFlushAtNewline(cur, t) {
+  const sig = cur.filter(isSig);
+  if (!sig.length) return true;                 // comment-only line
+  // region markers are whole lines
+  if (['#REGION', '#ENDREGION', 'REGION', 'END_REGION'].includes(sig[0].text.toUpperCase())) return true;
+  const last = sig[sig.length - 1];
+  if (last.type === 'punct' && last.text === ';') return true;
+  const lu = last.text.toUpperCase();
+  if ((last.type === 'kw' || last.type === 'struct') &&
+      ['THEN', 'DO', 'OF', 'ELSE', 'REPEAT', 'STRUCT', 'REGION', 'VAR', 'VAR_INPUT', 'VAR_OUTPUT',
+        'VAR_IN_OUT', 'VAR_TEMP', 'VAR_STAT', 'VAR_GLOBAL'].includes(lu)) return true;
+  if (t.type === 'struct') return true;
+  if (t.type === 'kw') {
+    const tu = t.text.toUpperCase();
+    if (tu !== 'THEN' && tu !== 'DO' && tu !== 'TO' && tu !== 'BY' && tu !== 'OF') return true;
+  }
+  return false;
+}
+
+function splitLogical(tokens, s) {
+  const lines = [];
+  let cur = [];
+  let comment = null;
+  let depth = 0;
+  let nl = 0;
+  let curBlank = 0;
+  let lastSemi = null;
+  // // comments found inside a statement (or at its end) are collected here and written after it,
+  // so the statement stays on one line.
+  let breaks = []; // {pos, comment}
+  const flush = () => {
+    const merged = breaks.length
+      ? { type: 'cmt', text: breaks.map((b) => b.comment.text).join(' ') }
+      : comment;
+    if (cur.length || comment) lines.push({ toks: cur, comment: merged, blank: curBlank });
+    cur = [];
+    comment = null;
+    breaks = [];
+  };
+  for (const t of tokens) {
+    if (t.type === 'ws') {
+      for (let k = 0; k < t.text.length; k++) if (t.text.charCodeAt(k) === 10) nl++;
+      continue;
+    }
+    if (t.type === 'cmt' && t.text.startsWith('//')) {
+      if (!cur.length && nl === 0 && lastSemi) {
+        // trailing comment after a split statement; joins any comments already collected for it
+        lastSemi.comment = lastSemi.comment ? { type: 'cmt', text: lastSemi.comment.text + ' ' + t.text } : t;
+      } else if (cur.length && nl === 0) {
+        // comment at the end of a physical line inside a statement: keep it at that point
+        breaks.push({ pos: cur.length, comment: t });
+      } else {
+        // a comment on its own line must not be pulled up onto the line before it
+        if (cur.length && nl > 0) flush();
+        if (!cur.length) curBlank = Math.max(0, nl - 1);
+        comment = t;
+        flush();
+      }
+      nl = 0;
+      lastSemi = null;
+      continue;
+    }
+    if (cur.length && nl > 0 && depth === 0 && shouldFlushAtNewline(cur, t)) flush();
+    if (!cur.length) curBlank = Math.max(0, nl - 1);
+    nl = 0;
+    lastSemi = null;
+    cur.push(t);
+    if (t.type === 'punct') {
+      if (t.text === '(') depth++;
+      else if (t.text === ')') depth = Math.max(0, depth - 1);
+      else if (t.text === ';' && depth === 0 && s.oneStatementPerLine) {
+        flush();
+        lastSemi = lines[lines.length - 1];
+      }
+    } else if (t.type === 'kw' && depth === 0 && s.oneStatementPerLine) {
+      // statement starts after THEN / DO / ELSE / REPEAT, and after OF of a CASE
+      const u = t.text.toUpperCase();
+      const firstSig = cur.find(isSig);
+      const caseOf = u === 'OF' && firstSig && firstSig.text.toUpperCase() === 'CASE';
+      if (['THEN', 'DO', 'ELSE', 'REPEAT'].includes(u) || caseOf) {
+        flush();
+        lastSemi = lines[lines.length - 1];   // a trailing // comment on this line stays here
+      }
+    }
+  }
+  flush();
+  return lines;
+}
+
+const indentStr = (s, ind) => (s.indentWith === 'tabs' ? '\t'.repeat(ind) : ' '.repeat(ind * s.indentSize));
+const indentW = (s, ind) => ind * s.indentSize;
+
+// Parse "name : type := init ;" (VAR / STRUCT context).
+function parseDecl(toks, s) {
+  let b = toks;
+  let semi = false;
+  if (b.length && b[b.length - 1].type === 'punct' && b[b.length - 1].text === ';') {
+    semi = true;
+    b = b.slice(0, -1);
+  }
+  if (findTop(b, (t) => t.type === 'punct' && t.text === ';') >= 0) return null;
+  const c = findTop(b, isColon);
+  if (c <= 0) return null;
+  const rest = b.slice(c + 1);
+  const a = findTop(rest, isAssign);
+  const typeToks = a >= 0 ? rest.slice(0, a) : rest;
+  if (!typeToks.some(isSig)) return null;
+  return {
+    name: renderTokens(b.slice(0, c), s),
+    type: renderTokens(typeToks, s),
+    init: a >= 0 ? renderTokens(rest.slice(a + 1), s) : null,
+    semi,
+  };
+}
+
+// IF / ELSIF / WHILE / UNTIL conditions. Returns entries or null when not breakable.
+function breakCondition(toks, ind, s) {
+  const kw = toks[0];
+  const ku = kw.text.toUpperCase();
+  let endIdx = -1;
+  let d = 0;
+  for (let k = 1; k < toks.length; k++) {
+    const t = toks[k];
+    if (t.type === 'punct') {
+      if (t.text === '(' || t.text === '[') d++;
+      else if (t.text === ')' || t.text === ']') d--;
+    }
+    if (d !== 0) continue;
+    const tu = t.text.toUpperCase();
+    if (ku !== 'UNTIL' && t.type === 'kw' && (tu === 'THEN' || tu === 'DO')) { endIdx = k; break; }
+    if (ku === 'UNTIL' && ((t.type === 'struct' && tu === 'END_REPEAT') || (t.type === 'punct' && t.text === ';'))) { endIdx = k; break; }
+  }
+  if (endIdx < 0) endIdx = toks.length;
+  const condToks = toks.slice(1, endIdx);
+  let tail = toks.slice(endIdx);
+  let endTok = null;
+  if (ku !== 'UNTIL') {
+    endTok = tail.length ? tail[0] : null;
+    tail = tail.slice(1);
+    if (tail.some(isSig)) return null; // statements after THEN/DO: leave the line alone
+  }
+  const items = splitOps(condToks);
+  if (items.length < 2) return null;
+  const res = emitBool(items, ind, renderTokens([kw], s) + ' ', s);
+  const lines = res.lines.slice();
+  let cur = res.cur;
+  if (endTok) {
+    const et = renderTokens([endTok], s);
+    if (s.thenDoPlacement === 'ownLine') {
+      lines.push(cur);
+      cur = { ind, text: et };
+    } else {
+      cur.text += ' ' + et;
+    }
+  }
+  if (tail.length) cur.text += ' ' + renderTokens(tail, s);
+  lines.push(cur);
+  return lines.map((l) => ({ kind: 'code', ind: l.ind, text: l.text, comment: null, first: null }));
+}
+
+// Lay out boolean operands; nested parenthesised groups are broken as a unit when enabled.
+function emitBool(items, ind, prefix, s) {
+  const lines = [];
+  let cur = { ind, text: prefix };
+  items.forEach((it, idx) => {
+    if (idx > 0) {
+      const opText = renderTokens([it.op], s);
+      if (s.operatorPosition === 'end') {
+        cur.text += ' ' + opText;
+        lines.push(cur);
+        cur = { ind: ind + 1, text: '' };
+      } else {
+        lines.push(cur);
+        cur = { ind: ind + 1, text: opText + ' ' };
+      }
+    }
+    const inner = s.indentNestedParens && wrapsWhole(it.toks) ? splitOps(it.toks.slice(1, -1)) : null;
+    if (inner && inner.length > 1) {
+      const sub = emitBool(inner, cur.ind, cur.text + '(', s);
+      lines.push(...sub.lines);
+      cur = { ind: sub.cur.ind, text: sub.cur.text + ')' };
+    } else {
+      cur.text += renderTokens(it.toks, s);
+    }
+  });
+  return { lines, cur };
+}
+
+// FB / instruction call with parameters on separate lines.
+function expandCall(toks, ind, s, flatWidth) {
+  if (s.callParams === 'oneLine') return null;
+  let body = toks;
+  let semi = false;
+  if (body.length && body[body.length - 1].type === 'punct' && body[body.length - 1].text === ';') {
+    semi = true;
+    body = body.slice(0, -1);
+  }
+  if (!body.length || body[body.length - 1].text !== ')') return null;
+  let d = 0;
+  let o = -1;
+  for (let k = body.length - 1; k >= 0; k--) {
+    const t = body[k];
+    if (t.type !== 'punct') continue;
+    if (t.text === ')') d++;
+    else if (t.text === '(') {
+      d--;
+      if (d === 0) { o = k; break; }
+    }
+  }
+  if (o < 1) return null;
+  const callee = body[o - 1];
+  if (callee.type !== 'ident' && callee.type !== 'call') return null;
+  const inner = body.slice(o + 1, body.length - 1);
+  if (!inner.some(isSig)) return null;
+  const args = splitTop(inner, (t) => t.type === 'punct' && t.text === ',');
+  const n = args.length;
+  const trigger = (s.callParams === 'whenMoreThanN' && n > s.callParamThreshold) ||
+                  (s.callParams === 'whenTooLong' && s.maxLineLength > 0 && flatWidth > s.maxLineLength);
+  if (!trigger) return null;
+  const head = renderTokens(body.slice(0, o + 1), s);
+  const parsed = args.map((a) => {
+    const k = findTop(a, (t) => t.type === 'op' && (t.text === ':=' || t.text === '=>'));
+    if (k > 0) return { name: renderTokens(a.slice(0, k), s), op: a[k].text, val: renderTokens(a.slice(k + 1), s) };
+    return { name: null, op: null, val: renderTokens(a, s) };
+  });
+  const maxName = s.alignCallParams ? Math.max(0, ...parsed.map((p) => (p.name ? p.name.length : 0))) : 0;
+  const op = s.spaceAroundOps ? ' ' : '';
+  const res = [{ kind: 'code', ind, text: head, comment: null, first: null }];
+  parsed.forEach((p, k) => {
+    const last = k === n - 1;
+    let text = '';
+    if (p.name !== null) {
+      text += (s.alignCallParams ? p.name.padEnd(maxName) : p.name) + op + p.op + op;
+    }
+    text += p.val;
+    text += last ? ')' + (semi ? ';' : '') : ',';
+    res.push({ kind: 'code', ind: ind + 1, text, comment: null, first: null });
+  });
+  return res;
+}
+
+function layoutDecls(grp, s) {
+  const op = s.spaceAroundOps ? ' ' : '';
+  const maxName = Math.max(...grp.map((e) => e.name.length));
+  const withInit = grp.filter((e) => e.init !== null);
+  const maxType = withInit.length ? Math.max(...withInit.map((e) => e.type.length)) : 0;
+  for (const e of grp) {
+    const name = s.alignDeclColon ? e.name.padEnd(maxName) : e.name;
+    let text;
+    if (e.init !== null) {
+      const type = s.alignDeclInit ? e.type.padEnd(maxType) : e.type;
+      text = `${name} : ${type}${op}:=${op}${e.init}`;
+    } else {
+      text = `${name} : ${e.type}`;
+    }
+    if (e.semi) text += ';';
+    e.text = text;
+  }
+}
+
+function layoutAssigns(grp, s) {
+  const op = s.spaceAroundOps ? ' ' : '';
+  const maxL = Math.max(...grp.map((e) => e.lhs.length));
+  for (const e of grp) {
+    const lhs = s.alignAssignments ? e.lhs.padEnd(maxL) : e.lhs;
+    e.text = lhs + op + ':=' + op + e.rhs;
+  }
+}
+
+function applyGroups(out, s) {
+  let i = 0;
+  while (i < out.length) {
+    const e = out[i];
+    if (e.kind !== 'decl' && e.kind !== 'assign') { i++; continue; }
+    let j = i;
+    while (j < out.length && out[j].kind === e.kind && out[j].ind === e.ind) j++;
+    const grp = out.slice(i, j);
+    if (e.kind === 'decl') layoutDecls(grp, s); else layoutAssigns(grp, s);
+    i = j;
+  }
+}
+
+function alignComments(out, s) {
+  let i = 0;
+  while (i < out.length) {
+    const e = out[i];
+    if (e.kind === 'blank' || !e.comment || e.text.includes('\n')) { i++; continue; }
+    let j = i;
+    while (j < out.length && out[j].kind !== 'blank' && out[j].comment && !out[j].text.includes('\n')) j++;
+    const grp = out.slice(i, j);
+    if (s.alignTrailingComments && grp.length > 1) {
+      const maxW = Math.max(...grp.map((x) => indentW(s, x.ind) + x.text.length));
+      for (const x of grp) x.pad = ' '.repeat(maxW - (indentW(s, x.ind) + x.text.length) + 1);
+    } else {
+      for (const x of grp) x.pad = ' ';
+    }
+    i = j;
+  }
+}
+
+function renderEntries(out, s, trailingNewline) {
+  applyGroups(out, s);
+  alignComments(out, s);
+  const lines = out.map((e) => {
+    if (e.kind === 'blank') return '';
+    let line = indentStr(s, e.ind) + e.text;
+    if (e.comment) line += (e.pad || ' ') + e.comment;
+    // trailing whitespace inside multi-line block comments is removed when the option is on
+    return s.trimTrailingWhitespace ? line.split('\n').map((l) => l.replace(/[ \t]+$/, '')).join('\n') : line;
+  });
+  return lines.join('\n') + (trailingNewline && lines.length ? '\n' : '');
+}
+
+// Main formatter. tokens: output of tokenize(). s: settings object.
+function format(tokens, s) {
+  const queue = splitLogical(tokens, s);
+  // mark runs of comment-only lines; a run containing a (* ... *) line is a comment section
+  for (let i = 0; i < queue.length;) {
+    if (!cmtOnly(queue[i])) { i++; continue; }
+    let j = i + 1;
+    while (j < queue.length && cmtOnly(queue[j]) && queue[j].blank === 0) j++;
+    queue[j - 1].runEnd = true;
+    if (queue.slice(i, j).some((x) => x.toks.length && x.toks[0].text.startsWith('(*'))) {
+      queue[i].secStart = true;
+      queue[j - 1].secEnd = true;
+    }
+    i = j;
+  }
+  let headerPending = false; // header #region seen: the comment block after it gets the "after" rule
+  let prevAfter = 'keep';    // blank-line rule carried from the previous line
+  const out = [];
+  const stack = [];
+  const top = () => (stack.length ? stack[stack.length - 1] : null);
+  const curInd = () => {
+    const t = top();
+    if (!t) return 0;
+    return t.kind === 'CASE' ? t.stmt : t.body;
+  };
+  const pushBlock = (u, level) => {
+    let body = level + 1;
+    let stmt = body;
+    if (u === 'CASE') {
+      body = level + (s.indentCaseLabels ? 1 : 0);
+      stmt = body + (s.indentCaseStatements ? 1 : 0);
+    } else if (u.startsWith('VAR') || u === 'STRUCT') {
+      body = level + (s.indentDeclarations ? 1 : 0);
+      stmt = body;
+    } else if (u === 'FUNCTION_BLOCK' || u === 'FUNCTION' || u === 'PROGRAM' || u === 'METHOD' ||
+               u === 'PROPERTY' || u === 'INTERFACE' || u === 'TYPE' || u === 'REGION') {
+      body = level;
+      stmt = level;
+    }
+    stack.push({ kind: u, level, body, stmt });
+  };
+  const isDeclCtx = (t) => !!t && (t.kind.startsWith('VAR') || t.kind === 'STRUCT');
+
+  for (let qi = 0; qi < queue.length; qi++) {
+    const L = queue[qi];
+    const sig = L.toks.filter(isSig);
+
+    // blank lines: input blanks (capped), then the region / comment-section rules
+    const regionStart = sig.some((t) => ['#REGION', 'REGION'].includes(t.text.toUpperCase()));
+    const regionEnd = !regionStart && sig.length > 0 && ['#ENDREGION', 'END_REGION'].includes(sig[0].text.toUpperCase());
+    const isHeader = regionStart && !out.some((e) => e.kind !== 'blank');
+    let rb = 'keep';
+    if (regionStart && !isHeader) rb = s.regionBlankBefore;
+    if (L.secStart) rb = mergeRule(rb, s.commentBlankBefore);
+    const want = mergeRule(rb, prevAfter);
+    let cnt = (L.blank > 0 && out.length > 0)
+      ? (s.maxBlankLines === 'keep' ? L.blank : Math.min(L.blank, Number(s.maxBlankLines)))
+      : 0;
+    if (want === 'yes' && out.length > 0) cnt = Math.max(cnt, 1);
+    if (want === 'no') cnt = 0;
+    for (let k = 0; k < cnt; k++) out.push({ kind: 'blank' });
+    // rule for the line after this one
+    let after = 'keep';
+    if (regionEnd) after = s.regionBlankAfter;
+    if (L.secEnd) after = mergeRule(after, s.commentBlankAfter);
+    if (headerPending && cmtOnly(L) && L.runEnd) { after = mergeRule(after, s.regionBlankAfter); headerPending = false; }
+    if (!cmtOnly(L)) headerPending = false;
+    if (isHeader) headerPending = true;
+    prevAfter = after;
+    if (sig.length && sig[0].type === 'kw' && sig[0].text.toUpperCase().startsWith('VAR') && s.blankLineBetweenVar) {
+      const last = out[out.length - 1];
+      if (last && last.first === 'END_VAR') out.push({ kind: 'blank' });
+    }
+
+    // comment-only line
+    if (!sig.length) {
+      let text = renderTokens(L.toks, s);
+      if (L.comment) text = text ? text + ' ' + L.comment.text : L.comment.text;
+      out.push({ kind: 'code', ind: curInd(), text, comment: null, first: null });
+      continue;
+    }
+
+    const first = sig[0];
+    const fu = first.text.toUpperCase();
+    const t0 = top();
+    const isStart = first.type === 'kw' || first.type === 'struct';
+    const isCloser = (first.type === 'struct' && fu.startsWith('END_')) || (first.type === 'kw' && fu === 'UNTIL');
+    const isMid = first.type === 'kw' && (fu === 'ELSE' || fu === 'ELSIF');
+
+    // CASE labels: "1: statement" -> label line, statement on its own line
+    if (t0 && t0.kind === 'CASE' && !isStart) {
+      const colon = findTop(L.toks, isColon);
+      const assign = findTop(L.toks, isAssign);
+      if (colon >= 0 && (assign < 0 || colon < assign)) {
+        const rest = L.toks.slice(colon + 1);
+        out.push({ kind: 'code', ind: t0.body, text: renderTokens(L.toks.slice(0, colon + 1), s),
+          comment: rest.length ? null : cmtText(L.comment), first: null });
+        if (rest.length) queue.splice(qi + 1, 0, { toks: rest, comment: L.comment, blank: 0 });
+        continue;
+      }
+    }
+
+    const ind = (isCloser || isMid) ? (t0 ? t0.level : 0) : curInd();
+
+    // stack effects of this line
+    for (const t of sig) {
+      if (t.type !== 'kw' && t.type !== 'struct') continue;
+      const u = t.text.toUpperCase();
+      if (u.startsWith('END_')) { if (stack.length) stack.pop(); }
+      else if (Object.prototype.hasOwnProperty.call(OPENERS, u)) pushBlock(u, curInd());
+    }
+
+    const flat = renderTokens(L.toks, s);
+    const width = indentW(s, ind) + flat.length;
+    const isHead = first.type === 'kw' && ['IF', 'ELSIF', 'WHILE', 'UNTIL'].includes(fu) && L.toks[0] === first;
+    let entries = null;
+
+    if (isHead && (s.breakConditions === 'always' ||
+        (s.breakConditions === 'whenTooLong' && s.maxLineLength > 0 && width > s.maxLineLength))) {
+      entries = breakCondition(L.toks, ind, s);
+    }
+    if (!entries && !isCloser && !isMid && !isHead && isDeclCtx(t0) && !isStart) {
+      const d = parseDecl(L.toks, s);
+      if (d) entries = [{ kind: 'decl', ind, ...d, text: '', comment: null, first: null }];
+    }
+    if (!entries && !isCloser && !isMid && !isHead && !isStart) {
+      entries = expandCall(L.toks, ind, s, width);
+    }
+    if (!entries && !isCloser && !isMid && !isHead && !isStart && !isDeclCtx(t0)) {
+      const a = findTop(L.toks, isAssign);
+      if (a > 0) {
+        entries = [{ kind: 'assign', ind, lhs: renderTokens(L.toks.slice(0, a), s),
+          rhs: renderTokens(L.toks.slice(a + 1), s), text: '', comment: null, first: null }];
+      }
+    }
+    if (!entries) entries = [{ kind: 'code', ind, text: flat, comment: null, first: null }];
+
+    entries[0].first = fu;
+    entries[entries.length - 1].comment = cmtText(L.comment);
+    out.push(...entries);
+  }
+
+  const trailingNewline = tokens.length > 0 && tokens[tokens.length - 1].text.endsWith('\n');
+  return renderEntries(out, s, trailingNewline);
+}
+
+// ---------- 3. Rendering helpers ------------------------------------------
+const TOKEN_CLASS = {
+  kw: 't-kw', struct: 't-struct', wordop: 't-op', type: 't-type', lit: 't-lit', str: 't-str',
+  cmt: 't-cmt', prag: 't-prag', ident: 't-id', call: 't-call', op: 't-op', punct: 't-punct', unk: 't-unk',
+};
+
+// Split tokens into display lines; each part keeps its token index.
+function splitLines(tokens) {
+  const lines = [[]];
+  tokens.forEach((t, idx) => {
+    t.text.split('\n').forEach((p, k) => {
+      if (k > 0) lines.push([]);
+      if (p.length) lines[lines.length - 1].push({ text: p, type: t.type, idx });
+    });
+  });
+  return lines;
+}
+
+// Folds: opener line -> closer line, only for blocks spanning at least 2 lines more.
+function computeFolds(tokens, pairs) {
+  const folds = new Map();
+  pairs.forEach((c, o) => {
+    const t = tokens[o];
+    if (c < o || (t.type !== 'kw' && t.type !== 'struct')) return;
+    if (t.text.toUpperCase().startsWith('END_')) return;
+    const sl = t.line;
+    const el = tokens[c].line;
+    if (el - sl >= 2 && !folds.has(sl)) folds.set(sl, el);
+  });
+  return folds;
+}
+
+// Normalised newlines. The page works with LF only.
+const normalizeNewlines = (text) => text.replace(/\r\n?/g, '\n');
+
+// ---------- 4. UI wiring ---------------------------------------------------
+function readStored() {
+  let raw;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch (e) {
+    return { settings: null, ok: false };
+  }
+  let obj = null;
+  try { obj = raw ? JSON.parse(raw) : null; } catch (e) { obj = null; }
+  if (obj && obj.version === SETTINGS_VERSION) return { settings: mergeSettings(obj.settings), ok: true };
+  return { settings: null, ok: true };
+}
+
+function writeStored(settings) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: SETTINGS_VERSION, settings }));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Build highlighted DOM for text into container. interactive adds folds and partner/occurrence highlight.
+function renderCode(container, text, settings, interactive, gutters = true) {
+  container.textContent = '';
+  const tokens = tokenize(text);
+  const pairs = pairBlocks(tokens);
+  const lines = splitLines(tokens);
+  const folds = interactive ? computeFolds(tokens, pairs) : new Map();
+  const byIdx = new Map();
+  const byName = new Map();
+  const frag = document.createDocumentFragment();
+
+  lines.forEach((parts, li) => {
+    const lineNo = li + 1;
+    const div = document.createElement('div');
+    div.className = 'ln';
+    div.dataset.line = String(lineNo);
+
+    const gut = document.createElement('span');
+    gut.className = 'gut';
+    if (folds.has(lineNo)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fold';
+      b.dataset.start = String(lineNo);
+      b.setAttribute('aria-label', 'Fold or unfold block');
+      b.textContent = '▾';
+      gut.appendChild(b);
+    }
+    gut.appendChild(document.createTextNode(String(lineNo)));
+
+    const code = document.createElement('span');
+    code.className = 'code-line';
+    const lineText = parts.map((p) => p.text).join('');
+    const lead = /^[ \t]*/.exec(lineText)[0];
+    let col = 0;
+    for (const ch of lead) col += ch === '\t' ? 4 : 1;
+    for (let g = 4; g < col; g += 4) {
+      const gd = document.createElement('span');
+      gd.className = 'ig';
+      gd.style.left = g + 'ch';
+      code.appendChild(gd);
+    }
+
+    for (const p of parts) {
+      const cls = TOKEN_CLASS[p.type];
+      if (!cls) {
+        code.appendChild(document.createTextNode(p.text));
+        continue;
+      }
+      const span = document.createElement('span');
+      span.className = cls;
+      span.textContent = p.text;
+      if (interactive) {
+        if (pairs.has(p.idx)) {
+          span.dataset.idx = String(p.idx);
+          if (!byIdx.has(p.idx)) byIdx.set(p.idx, []);
+          byIdx.get(p.idx).push(span);
+        }
+        if (p.type === 'ident' || p.type === 'call') {
+          const key = p.text.toLowerCase();
+          span.dataset.name = key;
+          if (!byName.has(key)) byName.set(key, []);
+          byName.get(key).push(span);
+        }
+      }
+      code.appendChild(span);
+    }
+    if (gutters) div.append(gut, code);
+    else div.append(code);
+    frag.appendChild(div);
+  });
+
+  container.appendChild(frag);
+  container.__model = interactive ? { pairs, byIdx, byName, folds } : null;
+  if (interactive) applyFolds(container);
+}
+
+const collapsedFolds = new Set();
+
+function applyFolds(container) {
+  const m = container.__model;
+  if (!m) return;
+  const hide = new Set();
+  for (const st of collapsedFolds) {
+    const en = m.folds.get(st);
+    if (en) for (let k = st + 1; k < en; k++) hide.add(k);
+  }
+  container.querySelectorAll('.ln').forEach((div) => { div.hidden = hide.has(Number(div.dataset.line)); });
+  container.querySelectorAll('button.fold').forEach((b) => {
+    b.textContent = collapsedFolds.has(Number(b.dataset.start)) ? '▸' : '▾';
+  });
+}
+
+function initUI() {
+  const $ = (id) => document.getElementById(id);
+  const src = $('src');
+  const out = $('out');
+  const dlg = $('settingsDlg');
+  const status = $('status');
+  const hl = $('srcHl');
+
+  const stored = readStored();
+  let settings = stored.settings ? stored.settings : { ...DEFAULT_SETTINGS };
+  $('storeNote').hidden = stored.ok;
+  let activeGroup = SETTING_GROUPS[0];
+
+  const flash = (msg) => { status.textContent = msg; };
+  const scheduleSave = (() => {
+    let timer = null;
+    return () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { $('storeNote').hidden = writeStored(settings); }, 300);
+    };
+  })();
+
+  function refresh() {
+    const t0 = performance.now();
+    const text = normalizeNewlines(src.value);
+    renderCode(out, text, settings, true);
+    const ms = Math.round(performance.now() - t0);
+    flash(`${text ? text.split('\n').length : 0} lines · rendered in ${ms} ms`);
+  }
+
+  function updatePreview() {
+    const formatted = format(tokenize(SAMPLE_ST), settings);
+    renderCode($('preview'), formatted, settings, false);
+  }
+
+  function setSetting(def, raw) {
+    let v;
+    if (def.type === 'bool') v = !!raw;
+    else {
+      const hit = def.options.find((o) => String(o[0]) === String(raw));
+      v = hit ? hit[0] : settings[def.key];
+    }
+    settings = { ...settings, [def.key]: v };
+    scheduleSave();
+    updatePreview();
+    applyToInput();
+  }
+
+  function renderFields() {
+    const box = $('fields');
+    box.textContent = '';
+    for (const def of SETTING_DEFS.filter((d) => d.group === activeGroup)) {
+      const row = document.createElement('label');
+      row.className = 'row';
+      const span = document.createElement('span');
+      span.textContent = def.label;
+      let ctl;
+      if (def.type === 'bool') {
+        ctl = document.createElement('input');
+        ctl.type = 'checkbox';
+        ctl.checked = !!settings[def.key];
+        ctl.addEventListener('change', () => setSetting(def, ctl.checked));
+      } else {
+        ctl = document.createElement('select');
+        for (const [v, l] of def.options) {
+          const o = document.createElement('option');
+          o.value = String(v);
+          o.textContent = l;
+          ctl.appendChild(o);
+        }
+        ctl.value = String(settings[def.key]);
+        ctl.addEventListener('change', () => setSetting(def, ctl.value));
+      }
+      row.append(span, ctl);
+      box.appendChild(row);
+    }
+  }
+
+  function renderTabs() {
+    const tabs = $('tabs');
+    tabs.textContent = '';
+    for (const g of SETTING_GROUPS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.textContent = g;
+      b.setAttribute('aria-selected', String(g === activeGroup));
+      b.addEventListener('click', () => {
+        activeGroup = g;
+        renderTabs();
+        renderFields();
+      });
+      tabs.appendChild(b);
+    }
+  }
+
+  // Replace the whole input text but keep the scroll position and caret, so the view does not jump.
+  // execCommand keeps the change on the undo stack (Ctrl+Z).
+  function replaceText(ta, text) {
+    const top = ta.scrollTop;
+    const left = ta.scrollLeft;
+    const pos = Math.min(ta.selectionStart, text.length);
+    ta.focus({ preventScroll: true });
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('insertText', false, text); } catch (e) { ok = false; }
+    if (!ok || ta.value !== text) ta.value = text;
+    ta.setSelectionRange(pos, pos);
+    ta.dispatchEvent(new Event('input'));
+    ta.scrollTop = top;
+    ta.scrollLeft = left;
+    hl.scrollTop = top;
+    hl.scrollLeft = left;
+  }
+
+  // Left pane: coloured copy of the text under the transparent textarea. Updated on every keystroke.
+  function highlightInput() {
+    renderCode(hl, normalizeNewlines(src.value), settings, false, false);
+  }
+
+  // Re-apply the current settings to the text in the input (undoable with Ctrl+Z).
+  function applyToInput() {
+    const res = format(tokenize(normalizeNewlines(src.value)), settings);
+    if (res !== src.value) replaceText(src, res);
+    else refresh();
+  }
+
+  let rtimer = null;
+  src.addEventListener('input', () => {
+    highlightInput();
+    clearTimeout(rtimer);
+    rtimer = setTimeout(refresh, 150);
+  });
+  src.addEventListener('scroll', () => {
+    hl.scrollTop = src.scrollTop;
+    hl.scrollLeft = src.scrollLeft;
+  });
+
+  $('btnFormat').addEventListener('click', () => {
+    const t0 = performance.now();
+    const res = format(tokenize(normalizeNewlines(src.value)), settings);
+    replaceText(src, res);
+    refresh();
+    flash(status.textContent + ` · formatted in ${Math.round(performance.now() - t0)} ms`);
+  });
+  $('btnClear').addEventListener('click', () => replaceText(src, ''));
+  $('btnSample').addEventListener('click', () => replaceText(src, SAMPLE_ST));
+  $('btnCollapse').addEventListener('click', (e) => {
+    const on = document.body.classList.toggle('reading');
+    e.currentTarget.setAttribute('aria-pressed', String(on));
+  });
+  $('btnCopy').addEventListener('click', async () => {
+    const text = src.value;
+    try {
+      await navigator.clipboard.writeText(text);
+      flash('Copied as plain text');
+    } catch (e) {
+      src.select();
+      const ok = document.execCommand('copy');
+      flash(ok ? 'Copied as plain text' : 'Copy failed: select the text and press Ctrl+C');
+    }
+  });
+  $('theme').addEventListener('change', (e) => {
+    const v = e.target.value;
+    if (v === 'system') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', v);
+  });
+
+  $('btnSettings').addEventListener('click', () => {
+    renderTabs();
+    renderFields();
+    updatePreview();
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  });
+  $('btnCloseSettings').addEventListener('click', () => dlg.close ? dlg.close() : dlg.removeAttribute('open'));
+
+  const io = $('io');
+  const ioMsg = $('ioMsg');
+  $('btnExport').addEventListener('click', () => {
+    io.value = JSON.stringify({ version: SETTINGS_VERSION, settings }, null, 2);
+    ioMsg.textContent = 'Settings written to the text box. Copy it to share.';
+  });
+  $('btnImport').addEventListener('click', () => {
+    try {
+      const obj = JSON.parse(io.value);
+      settings = mergeSettings(obj && obj.settings ? obj.settings : obj);
+      scheduleSave();
+      renderFields();
+      updatePreview();
+      applyToInput();
+      ioMsg.textContent = 'Imported. Unknown keys were ignored.';
+    } catch (e) {
+      ioMsg.textContent = 'Could not read that text as settings JSON.';
+    }
+  });
+  $('btnReset').addEventListener('click', () => {
+    settings = { ...DEFAULT_SETTINGS };
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* storage blocked: nothing to clear */ }
+    renderFields();
+    updatePreview();
+    applyToInput();
+    ioMsg.textContent = 'Reset to defaults.';
+  });
+
+  out.addEventListener('click', (e) => {
+    const b = e.target.closest('button.fold');
+    if (b) {
+      const st = Number(b.dataset.start);
+      if (collapsedFolds.has(st)) collapsedFolds.delete(st); else collapsedFolds.add(st);
+      applyFolds(out);
+      return;
+    }
+    const sp = e.target.closest('span');
+    const m = out.__model;
+    if (!sp || !m) return;
+    if (sp.dataset.name) {
+      document.querySelectorAll('.occ').forEach((x) => x.classList.remove('occ'));
+      (m.byName.get(sp.dataset.name) || []).forEach((x) => x.classList.add('occ'));
+    } else if (sp.dataset.idx) {
+      document.querySelectorAll('.hl2').forEach((x) => x.classList.remove('hl2'));
+      const idx = Number(sp.dataset.idx);
+      const partner = m.pairs.get(idx);
+      [idx, partner].forEach((k) => (m.byIdx.get(k) || []).forEach((x) => x.classList.add('hl2')));
+    }
+  });
+  let hovered = [];
+  out.addEventListener('mouseover', (e) => {
+    const sp = e.target.closest('span[data-idx]');
+    const m = out.__model;
+    hovered.forEach((x) => x.classList.remove('hl'));
+    hovered = [];
+    if (!sp || !m) return;
+    const idx = Number(sp.dataset.idx);
+    const partner = m.pairs.get(idx);
+    [idx, partner].forEach((k) => (m.byIdx.get(k) || []).forEach((x) => { x.classList.add('hl'); hovered.push(x); }));
+  });
+
+  // Format Ctrl+Enter shortcut is intentionally not added; buttons only (keeps keys predictable).
+  src.value = '';
+  refresh();
+}
+
+// Sample routine: illustrative only, not from a real project, no real names or addresses.
+const SAMPLE_ST = `(* SAMPLE ROUTINE: illustrative only, not from a real project
+   note: trailing spaces on this line are removed only when trimming is on\x20\x20\x20
+*)
+{attribute 'qualified_only'}
+FUNCTION_BLOCK FB_SampleDoor
+VAR_INPUT
+    bDoorClosed:BOOL;   // door switch
+    bAirPressureOk : BOOL;
+    bEStopActive : BOOL;
+    bModeAuto : BOOL;
+    bModeManual : BOOL;
+END_VAR
+VAR
+    nRetryCount:int:=0;   // retries in this cycle
+    tACK_WD_TOUT : TIME := T#2S;   // ack watchdog
+    tonStartDelay : TON;
+    fbValve : FB_Valve;
+    iStep : INT;
+END_VAR
+
+
+REGION Main
+IF bDoorClosed AND bAirPressureOk AND NOT bEStopActive AND (bModeAuto OR bModeManual) AND tonStartDelay.Q AND bGuardsOk AND NOT bFault THEN
+bStartAllowed := TRUE; nRetryCount := nRetryCount + 1;
+END_IF;
+
+fbValve(execute := bOpenCmd, reset := bReset, ready => bValveReady, error => bValveError);
+fbBatch(execute := bBatchStart, reset := bReset, ready => bBatchReady, error => bBatchErr, mode := iMode, count => nCount);
+
+case iStep of
+1:
+tonStartDelay(IN := bStartAllowed, PT := tACK_WD_TOUT);
+2: iStep := 0;
+else
+iStep := 0;
+end_case;
+
+(* Timer section *)
+TONR(MyTimer);
+(* Check section *)
+
+bFlag := true AND Local:1:I.Data.3 AND (16#FF > 2#1010);
+rValue := 1.5E3 * INT#5 / 2.0;
+sText := 'it$'s ok';
+stStatus.bForceOn := TRUE;
+END_REGION
+bDone := TRUE;
+`;
+
+if (typeof document !== 'undefined' && document.getElementById('src')) {
+  initUI();
+}
+</script>
+</body>
+</html>
